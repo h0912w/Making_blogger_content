@@ -770,13 +770,30 @@ def preprocess_input(api_key: str) -> bool:
 
     print_info("CLAUDE.md 분석 중...")
 
+    # 웹서비스 여부 판단 (키워드 기반)
+    web_service_keywords = ['웹서비스', 'web service', '웹 앱', 'web app', '사이트', 'website',
+                          'api', '도구', 'tool', '플랫폼', 'platform', '서비스', 'service']
+    is_web_service = any(keyword in claude_md_content.lower() for keyword in web_service_keywords)
+
+    if is_web_service:
+        print_info("웹서비스 프로젝트로 판단됨")
+    else:
+        print_info("블로그 글/튜토리얼 프로젝트로 판단됨")
+
     # blogger-doc-generator 에이전트를 통해 input.txt 생성
     # (실제로는 API를 호출하여 프롬프트 생성)
+    article_type = "웹서비스 소개" if is_web_service else "블로그 글 작성 가이드"
+    title_type = "서비스 소개형/기능 강조형/가치 제안형" if is_web_service else "사용법 설명형/팁 공유형/가이드형"
+
     preprocessor_prompt = f"""당신은 Blogger 콘텐츠 생성 전문가입니다.
 
-다음 CLAUDE.md 파일 내용을 분석하여, SEO 최적화된 블로그 글을 작성하기 위한 input.txt 내용을 생성해주세요.
+다음 CLAUDE.md 파일 내용을 분석하여, SEO 최적화된 {article_type}를 위한 input.txt 내용을 생성해주세요.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[분석 결과]
+프로젝트 유형: {article_type}
+제목 타입 가이드: {title_type}
 
 [CLAUDE.md 내용]
 {claude_md_content[:10000]}  # 내용이 길 경우 앞부분 10000자만 사용
@@ -785,15 +802,23 @@ def preprocess_input(api_key: str) -> bool:
 
 요구사항:
 1. CLAUDE.md의 내용을 분석하여 프로젝트의 핵심 내용 파악
-2. 블로그 글 작성을 위한 적절한 input.txt 형식으로 변환
+2. {article_type}을 위한 적절한 input.txt 형식으로 변환
 3. 글의 주제, 타겟 독자, 핵심 전달 내용, 추가 요구사항 포함
+
+{'웹서비스일 경우 제목 가이드:' if is_web_service else ''}
+- 서비스 이름 + 핵심 기능 (예: "무료 도구: 저항값만 입력하면 Mouser 부품 자동 매칭")
+- "도구", "서비스", "플랫폼" 등의 키워드 포함
+- 사용법 설명("~하는 법")보다는 서비스 소개형
+{'블로그 글일 경우 제목 가이드:' if not is_web_service else ''}
+- "~하는 법", "~방법", "~가이드" 등 사용법 설명형
+- 팁, 트릭, 해결책 강조
 
 아래 형식에 맞춰 결과를 출력해주세요:
 
 글의 주제: [CLAUDE.md에서 파악한 프로젝트 주제]
 타겟 독자: [CLAUDE.md에서 파악한 타겟 독자]
 핵심 전달 내용: [CLAUDE.md에서 파악한 핵심 전달 내용]
-추가 요구사항: [CLAUDE.md에서 파악한 추가 요구사항]
+추가 요구사항: 프로젝트 유형을 고려하여 제목 생성 가이드 추가 ({article_type}에 맞는 제목 형태 제안)
 
 이 내용은 input.txt 파일로 저장될 것입니다.
 """
