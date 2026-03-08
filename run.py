@@ -741,6 +741,93 @@ def generate_output_with_retry(api_key: str, input_content: str, seo_rules: str,
     return final_content, final_analysis
 
 
+def preprocess_input(api_key: str) -> bool:
+    """
+    입력 전처리: input_plan/CLAUDE.md가 있으면 input.txt 자동 생성
+
+    Args:
+        api_key: API Key
+
+    Returns:
+        input.txt가 수정되었는지 여부
+    """
+    input_plan_path = os.path.join(CURRENT_DIR, "input_plan", "CLAUDE.md")
+    input_path = os.path.join(CURRENT_DIR, "input", "input.txt")
+
+    # input_plan/CLAUDE.md 파일 존재 여부 확인
+    if not os.path.exists(input_plan_path):
+        print_info("input_plan/CLAUDE.md 파일이 없습니다. 기존 input.txt를 사용합니다.")
+        return False
+
+    print("\n0. 입력 전처리 (input_plan/CLAUDE.md 분석)...")
+    print_info("input_plan/CLAUDE.md 파일을 발견했습니다.")
+
+    # CLAUDE.md 내용 읽기
+    claude_md_content = read_file(input_plan_path)
+    if not claude_md_content:
+        print_error("input_plan/CLAUDE.md 읽기 실패. 기존 input.txt를 사용합니다.")
+        return False
+
+    print_info("CLAUDE.md 분석 중...")
+
+    # blogger-doc-generator 에이전트를 통해 input.txt 생성
+    # (실제로는 API를 호출하여 프롬프트 생성)
+    preprocessor_prompt = f"""당신은 Blogger 콘텐츠 생성 전문가입니다.
+
+다음 CLAUDE.md 파일 내용을 분석하여, SEO 최적화된 블로그 글을 작성하기 위한 input.txt 내용을 생성해주세요.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[CLAUDE.md 내용]
+{claude_md_content[:10000]}  # 내용이 길 경우 앞부분 10000자만 사용
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+요구사항:
+1. CLAUDE.md의 내용을 분석하여 프로젝트의 핵심 내용 파악
+2. 블로그 글 작성을 위한 적절한 input.txt 형식으로 변환
+3. 글의 주제, 타겟 독자, 핵심 전달 내용, 추가 요구사항 포함
+
+아래 형식에 맞춰 결과를 출력해주세요:
+
+글의 주제: [CLAUDE.md에서 파악한 프로젝트 주제]
+타겟 독자: [CLAUDE.md에서 파악한 타겟 독자]
+핵심 전달 내용: [CLAUDE.md에서 파악한 핵심 전달 내용]
+추가 요구사항: [CLAUDE.md에서 파악한 추가 요구사항]
+
+이 내용은 input.txt 파일로 저장될 것입니다.
+"""
+
+    # API 호출
+    generated_input = call_api(api_key, preprocessor_prompt)
+    if not generated_input:
+        print_error("input.txt 생성 실패. 기존 input.txt를 사용합니다.")
+        return False
+
+    # 생성된 input.txt 내용 정제
+    # API 응답에서 필요한 부분만 추출
+    import re
+    input_content = generated_input
+
+    # 필요한 형식으로 정제
+    lines = input_content.split('\n')
+    refined_lines = []
+    for line in lines:
+        if line.strip().startswith(('글의 주제:', '타겟 독자:', '핵심 전달 내용:', '추가 요구사항:')):
+            refined_lines.append(line)
+        elif line.strip() and refined_lines:
+            refined_lines[-1] += '\n' + line
+
+    refined_content = '\n'.join(refined_lines) if refined_lines else generated_input
+
+    # input.txt 저장
+    if write_file(input_path, refined_content):
+        print_success("input.txt 자동 생성 완료 (input_plan/CLAUDE.md 기반)")
+        return True
+
+    return False
+
+
 def run_optimization():
     """최적화 실행 메인 함수"""
     print_header("SEO Blog AI Optimizer v2.0.0")
@@ -755,41 +842,8 @@ def run_optimization():
 
     print_success("의존성 확인 완료")
 
-    # 1. 입력 파일 읽기
-    print("\n1. 입력 파일 읽기...")
-    input_path = os.path.join(CURRENT_DIR, "input", "input.txt")
-    input_content = read_file(input_path)
-
-    if not input_content:
-        print_error("input.txt 파일이 비어있거나 없습니다.")
-        print_info(f"파일 위치: {input_path}")
-        input("\n엔터를 눌러 종료...")
-        return
-
-    print_success(f"입력 파일 확인 완료 ({len(input_content)}자)")
-
-    # 2. SEO 규칙 파일 읽기
-    print("\n2. SEO 규칙 읽기...")
-    seo_rules_path = os.path.join(CURRENT_DIR, "docs", "seo_rules.md")
-    seo_rules = read_file(seo_rules_path)
-
-    if not seo_rules:
-        print_warning("SEO 규칙 파일이 비어있거나 없습니다. 기본 규칙 사용.")
-    else:
-        print_success("SEO 규칙 로드 완료")
-
-    # 3. AI 검색 규칙 파일 읽기
-    print("\n3. AI 검색 규칙 읽기...")
-    ai_rules_path = os.path.join(CURRENT_DIR, "docs", "ai_search_rules.md")
-    ai_rules = read_file(ai_rules_path)
-
-    if not ai_rules:
-        print_warning("AI 검색 규칙 파일이 비어있거나 없습니다. 기본 규칙 사용.")
-    else:
-        print_success("AI 검색 규칙 로드 완료")
-
-    # 4. API Key 읽기
-    print("\n4. API 설정 확인...")
+    # 1. API Key 읽기 (입력 전처리를 위해 먼저 읽음)
+    print("\n1. API 설정 확인...")
     api_key_path = os.path.join(CURRENT_DIR, "config", "api_key.txt")
     api_key_content = read_file(api_key_path)
 
@@ -809,8 +863,44 @@ def run_optimization():
 
     print_success("API Key 확인 완료")
 
-    # 5. 피드백 루프를 포함한 콘텐츠 생성
-    print("\n5. AI 콘텐츠 생성 및 검증...")
+    # 2. 입력 전처리 (input_plan/CLAUDE.md가 있으면 input.txt 자동 생성)
+    preprocess_input(api_key)
+
+    # 3. 입력 파일 읽기
+    print("\n3. 입력 파일 읽기...")
+    input_path = os.path.join(CURRENT_DIR, "input", "input.txt")
+    input_content = read_file(input_path)
+
+    if not input_content:
+        print_error("input.txt 파일이 비어있거나 없습니다.")
+        print_info(f"파일 위치: {input_path}")
+        input("\n엔터를 눌러 종료...")
+        return
+
+    print_success(f"입력 파일 확인 완료 ({len(input_content)}자)")
+
+    # 4. SEO 규칙 파일 읽기
+    print("\n4. SEO 규칙 읽기...")
+    seo_rules_path = os.path.join(CURRENT_DIR, "docs", "seo_rules.md")
+    seo_rules = read_file(seo_rules_path)
+
+    if not seo_rules:
+        print_warning("SEO 규칙 파일이 비어있거나 없습니다. 기본 규칙 사용.")
+    else:
+        print_success("SEO 규칙 로드 완료")
+
+    # 5. AI 검색 규칙 파일 읽기
+    print("\n5. AI 검색 규칙 읽기...")
+    ai_rules_path = os.path.join(CURRENT_DIR, "docs", "ai_search_rules.md")
+    ai_rules = read_file(ai_rules_path)
+
+    if not ai_rules:
+        print_warning("AI 검색 규칙 파일이 비어있거나 없습니다. 기본 규칙 사용.")
+    else:
+        print_success("AI 검색 규칙 로드 완료")
+
+    # 6. 피드백 루프를 포함한 콘텐츠 생성
+    print("\n6. AI 콘텐츠 생성 및 검증...")
 
     result, analysis = generate_output_with_retry(api_key, input_content, seo_rules, ai_rules, MAX_RETRIES)
 
@@ -818,7 +908,7 @@ def run_optimization():
         input("\n엔터를 눌러 종료...")
         return
 
-    # 6. 결과 저장
+    # 7. 결과 저장
     print("\n6. 결과 저장...")
     output_path = os.path.join(CURRENT_DIR, "output", "output.txt")
 
