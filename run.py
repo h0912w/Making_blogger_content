@@ -313,7 +313,7 @@ def call_api(api_key: str, prompt: str) -> Optional[str]:
         return None
 
 
-def create_generation_prompt(input_content: str, seo_rules: str, ai_rules: str, previous_feedback: str = "") -> str:
+def create_generation_prompt(input_content: str, seo_rules: str, ai_rules: str, previous_feedback: str = "", keyword_analysis: dict = None) -> str:
     """
     콘텐츠 생성 프롬프트 생성 (제목 5개 + 한/영 버전)
 
@@ -322,6 +322,7 @@ def create_generation_prompt(input_content: str, seo_rules: str, ai_rules: str, 
         seo_rules: SEO 규칙
         ai_rules: AI 검색 규칙
         previous_feedback: 이전 피드백 (재생성 시)
+        keyword_analysis: 키워드 분석 결과
 
     Returns:
         생성된 프롬프트
@@ -853,6 +854,95 @@ def preprocess_input(api_key: str) -> bool:
     return False
 
 
+def analyze_keywords(api_key: str, input_content: str) -> dict:
+    """
+    키워드 분석: 구글 검색이나 AI 추천에 낫을 하기 쉬운 키워드 분석
+
+    Args:
+        api_key: API Key
+        input_content: input.txt 내용
+
+    Returns:
+        키워드 분석 결과 딕셔너리
+    """
+    print_info("키워드 분석 중...")
+
+    # 키워드 추출 프롬프트
+    analyze_prompt = f"""당신은 SEO 및 키워드 분석 전문가입니다.
+
+다음 블로그 글 내용을 바탕으로, 구글 검색이나 AI 추천에 낫을 하기 쉬운 키워드를 분석해주세요.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[블로그 글 내용]
+{input_content}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+요구사항:
+1. 블로그 글에서 중요한 키워드를 추출 (메인 키워드, 관련 키워드 3-5개)
+2. 각 키워드에 대해 다음을 분석:
+   - 구글 월간 검색량 (추정)
+   - 경쟁도 (상/중/하)
+   - 동일한 키워드로 된 기존 상위 글의 수 (추정)
+3. 낫은 하기 쉬운 키워드(검색량이 높고 경쟁도가 낮은 키워드)를 우선 추천
+4. 제목에 꼭 넣어야만 하는 핵심 키워드 3개 추천
+
+아래 형식에 맞춰 결과를 출력해주세요:
+
+[추천 타겟 키워드]
+- 키워드 1: [검색량 추정 / 경쟁도 / 경쟁 낮은 이유]
+- 키워드 2: [검색량 추정 / 경쟁도 / 경쟁 낮은 이유]
+- 키워드 3: [검색량 추정 / 경쟁도 / 경쟁 낮은 이유]
+
+[제목에 넣어야만 하는 키워드]
+1. 키워드 A
+2. 키워드 B
+3. 키워드 C
+
+[키워드 분석 근거]
+- 검색량: 높음(10,000+/월), 중간(1,000-9,999/월), 낮음(1,000 미만/월)
+- 경쟁도: 상(상위 10위 내 기존 글 많음), 중(상위 11-30위), 하(상위 31위 이후)
+- 동일한 키워드로 된 글 수: 매우 많음(100+), 많음(50-99), 보통(20-49), 적음(10-19), 매우 적음(10 미만)
+"""
+
+    # API 호출
+    analysis_result = call_api(api_key, analyze_prompt)
+    if not analysis_result:
+        print_error("키워드 분석 실패.")
+        return {
+            "target_keywords": [],
+            "must_include_keywords": [],
+            "analysis": "분석 실패"
+        }
+
+    # 분석 결과 파싱
+    import re
+    lines = analysis_result.split('\n')
+    target_keywords = []
+    must_include_keywords = []
+    current_section = None
+
+    for line in lines:
+        stripped = line.strip()
+        if '[추천 타겟 키워드]' in stripped:
+            current_section = 'target'
+        elif '[제목에 넣어야만 하는 키워드]' in stripped:
+            current_section = 'must_include'
+        elif current_section and stripped.startswith(('- ', '• ')):
+            keyword = stripped.split(':', 1)[0].strip('- • ').strip()
+            if current_section == 'target':
+                target_keywords.append(keyword)
+            elif current_section == 'must_include':
+                must_include_keywords.append(keyword)
+
+    return {
+        "target_keywords": target_keywords,
+        "must_include_keywords": must_include_keywords,
+        "analysis": analysis_result[:500]  # 요약만 저장
+    }
+
+
 def run_optimization():
     """최적화 실행 메인 함수"""
     print_header("SEO Blog AI Optimizer v2.0.0")
@@ -891,12 +981,22 @@ def run_optimization():
     # 2. 입력 전처리 (input_plan/CLAUDE.md가 있으면 input.txt 자동 생성)
     preprocess_input(api_key)
 
-    # 3. 입력 파일 읽기
-    print("\n3. 입력 파일 읽기...")
+    # 2.5. 키워드 분석 (input.txt 기반)
+    print("\n2.5. 키워드 분석...")
     input_path = os.path.join(CURRENT_DIR, "input", "input.txt")
     input_content = read_file(input_path)
 
     if not input_content:
+        print_error("input.txt 파일이 비어있거나 없습니다.")
+        print_info(f"파일 위치: {input_path}")
+        input("\n엔터를 눌러 종료...")
+        return
+
+    keyword_analysis = analyze_keywords(api_key, input_content)
+    print_success(f"키워드 분석 완료: {len(keyword_analysis['must_include_keywords'])}개 추천 키워드")
+
+    # 3. 입력 파일 읽기 (이미 위에서 읽음)
+    print("\n3. 입력 파일 확인 완료")
         print_error("input.txt 파일이 비어있거나 없습니다.")
         print_info(f"파일 위치: {input_path}")
         input("\n엔터를 눌러 종료...")
