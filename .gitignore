@@ -39,7 +39,7 @@ ENV/
 config/api_key.txt
 
 # Output files (generated)
-output/*.txt
+# output/*.txt  # Commented out to upload results for mobile viewing
 
 # OS
 .DS_Store
