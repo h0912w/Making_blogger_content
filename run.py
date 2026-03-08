@@ -29,6 +29,7 @@ MAX_RETRIES = 3
 ANALYSIS_PASS_THRESHOLD = 70
 TITLE_PASS_THRESHOLD = 35
 CONTENT_PASS_THRESHOLD = 35
+KEYWORD_SUCCESS_THRESHOLD = 50
 
 
 class Colors:
@@ -336,6 +337,24 @@ def create_generation_prompt(input_content: str, seo_rules: str, ai_rules: str, 
     # 피드백 추가 (있는 경우)
     feedback_section = f"\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n[이전 피드백 반영]\n{previous_feedback}" if previous_feedback else ""
 
+    # 키워드 분석 섹션
+    keyword_section = ""
+    if keyword_analysis and keyword_analysis.get("must_include_keywords"):
+        must_include = keyword_analysis.get("must_include_keywords", [])
+        target_keywords = keyword_analysis.get("target_keywords", [])
+        keyword_section = f"""
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[키워드 분석 결과]
+제목에 꼭 넣어야만 하는 키워드:
+{', '.join(must_include)}
+
+추천 타겟 키워드:
+{', '.join(target_keywords)}
+
+**중요:** 위 '제목에 꼭 넣어야만 하는 키워드'는 반드시 모든 제목에 포함시켜야 합니다."""
+
     prompt = f"""당신은 SEO 및 AI 검색 노출 전문가입니다.
 
 다음 정보를 바탕으로 최적화된 블로그 글 제목 5개와 본문 가이드를 한국어와 영어로 생성해주세요.
@@ -355,18 +374,18 @@ def create_generation_prompt(input_content: str, seo_rules: str, ai_rules: str, 
 [AI 검색 노출 규칙 요약]
 {ai_summary}
 {feedback_section}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{keyword_section}
 
 요구사항:
 1. 제목은 5개 제안하며, 각 제목에 예상 클릭률(High/Medium/Low), SEO 점수(0-100), 설명 포함
 2. 5개의 제목은 다른 각도로 구성 (질문형, 숫자형, 혜택형, 궁금증형, 긴급형 등)
-3. 본문은 한국어와 영어 두 버전으로 생성
-4. 본문은 H2/H3 구조, 키워드 자연스러운 배치, 3-5문장 단락
-5. AI 검색 엔진이 쉽게 인용할 수 있는 직접적인 답변 형식
-6. E-E-A-T 요소 강화 (경험, 전문성, 권위성, 신뢰성)
-7. 구조화된 정보 (불릿 포인트, 표, 번호 매기기) 활용
-8. FAQ 섹션 포함 (AI 인용 최적화)
+3. **모든 제목에 '제목에 꼭 넣어야만 하는 키워드'가 반드시 포함되어야 합니다**
+4. 본문은 한국어와 영어 두 버전으로 생성
+5. 본문은 H2/H3 구조, 키워드 자연스러운 배치, 3-5문장 단락
+6. AI 검색 엔진이 쉽게 인용할 수 있는 직접적인 답변 형식
+7. E-E-A-T 요소 강화 (경험, 전문성, 권위성, 신뢰성)
+8. 구조화된 정보 (불릿 포인트, 표, 번호 매기기) 활용
+9. FAQ 섹션 포함 (AI 인용 최적화)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -586,8 +605,17 @@ def create_analysis_prompt(generated_content: str, seo_rules: str, ai_rules: str
 4. 키워드 최적화 (0-10): 자연스러운 배치
 5. 이중 언어 지원 (0-10): 한국어/영어 버전 포함
 
+### 키워드 성공 가능성 분석 (0-100점)
+1. 핵심 키워드 추출 (최대 5개): 제목과 본문에서 중요한 키워드 식별
+2. 각 키워드별 검색량 조사 (월간 검색량 추정)
+3. 각 키워드별 경쟁 콘텐츠 수 조사 (구글 상위 페이지 수)
+4. 키워드 난이도 평가 (상/중/하)
+5. 경쟁 강도 분석 (높음/보통/낮음)
+6. 성공 가능성 점수 산정 (0-100): 검색량 × (1/경쟁도) × 콘텐츠 품질 점수의 가중 평균
+7. 추천 타겟 키워드 선정 (성공 가능성 상위 3개)
+
 ## PASS/FAIL 기준
-- PASS: 총점 70점 이상 AND 제목 35점 이상 AND 본문 35점 이상
+- PASS: 총점 70점 이상 AND 제목 35점 이상 AND 본문 35점 이상 AND 키워드 성공 점수 50점 이상
 - FAIL: 그 외
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -616,31 +644,49 @@ __/50
 - 키워드 최적화: _/10
 - 이중 언어 지원: _/10
 
+[키워드 성공 가능성 점수]
+__/100
+
+[키워드 분석 상세]
+| 키워드 | 월간 검색량 | 경쟁 콘텐츠 수 | 난이도 | 경쟁 강도 | 성공 가능성 |
+|--------|-------------|----------------|--------|----------|-------------|
+| 키워드1 | _ | _ | 상/중/하 | 높음/보통/낮음 | _ |
+| 키워드2 | _ | _ | 상/중/하 | 높음/보통/낮음 | _ |
+| 키워드3 | _ | _ | 상/중/하 | 높음/보통/낮음 | _ |
+
+[추천 타겟 키워드] (성공 가능성 상위 3개)
+1. 키워드명 - 성공 가능성: _점
+2. 키워드명 - 성공 가능성: _점
+3. 키워드명 - 성공 가능성: _점
+
 {{FAIL인 경우 아래 추가}}
 [개선 피드백]
 1. 제목 개선 사항:
    - 구체적인 개선 사항
 2. 본문 개선 사항:
    - 구체적인 개선 사항
+3. 키워드 최적화 제안:
+   - 구체적인 키워드 조정 사항
 """
     return prompt
 
 
 def parse_analysis_result(analysis_text: str) -> Dict:
     """
-    분석 결과 파싱 (PASS/FAIL + 피드백 추출)
+    분석 결과 파싱 (PASS/FAIL + 피드백 + 키워드 성공 점수 추출)
 
     Args:
         analysis_text: 분석 결과 텍스트
 
     Returns:
-        분석 결과 딕셔너리 {result, total_score, title_score, content_score, feedback}
+        분석 결과 딕셔너리 {result, total_score, title_score, content_score, keyword_success_score, feedback}
     """
     result = {
         "result": "FAIL",
         "total_score": 0,
         "title_score": 0,
         "content_score": 0,
+        "keyword_success_score": 0,
         "feedback": ""
     }
 
@@ -664,6 +710,11 @@ def parse_analysis_result(analysis_text: str) -> Dict:
     if content_match:
         result["content_score"] = int(content_match.group(1))
 
+    # 키워드 성공 가능성 점수 추출
+    keyword_match = re.search(r'\[키워드 성공 가능성 점수\]\s*(\d+)/100', analysis_text)
+    if keyword_match:
+        result["keyword_success_score"] = int(keyword_match.group(1))
+
     # 피드백 추출
     feedback_match = re.search(r'\[개선 피드백\](.*?)(?=\n\n|\Z)', analysis_text, re.DOTALL)
     if feedback_match:
@@ -672,7 +723,8 @@ def parse_analysis_result(analysis_text: str) -> Dict:
     return result
 
 
-def generate_output_with_retry(api_key: str, input_content: str, seo_rules: str, ai_rules: str, max_retries: int = 3) -> Tuple[Optional[str], Dict]:
+def generate_output_with_retry(api_key: str, input_content: str, seo_rules: str, ai_rules: str,
+                                keyword_analysis: dict = None, max_retries: int = 3) -> Tuple[Optional[str], Dict]:
     """
     피드백 루프를 포함한 콘텐츠 생성 (최대 3회 재시도)
 
@@ -681,6 +733,7 @@ def generate_output_with_retry(api_key: str, input_content: str, seo_rules: str,
         input_content: 입력 콘텐츠
         seo_rules: SEO 규칙
         ai_rules: AI 검색 규칙
+        keyword_analysis: 키워드 분석 결과
         max_retries: 최대 재시도 횟수
 
     Returns:
@@ -688,13 +741,13 @@ def generate_output_with_retry(api_key: str, input_content: str, seo_rules: str,
     """
     previous_feedback = ""
     final_content = None
-    final_analysis = {"result": "FAIL", "total_score": 0, "title_score": 0, "content_score": 0, "attempts": 0}
+    final_analysis = {"result": "FAIL", "total_score": 0, "title_score": 0, "content_score": 0, "keyword_success_score": 0, "attempts": 0}
 
     for attempt in range(1, max_retries + 1):
         print_info(f"생성 시도 {attempt}/{max_retries}...")
 
         # 콘텐츠 생성
-        generation_prompt = create_generation_prompt(input_content, seo_rules, ai_rules, previous_feedback)
+        generation_prompt = create_generation_prompt(input_content, seo_rules, ai_rules, previous_feedback, keyword_analysis)
         content = call_api(api_key, generation_prompt)
 
         if not content:
@@ -721,12 +774,14 @@ def generate_output_with_retry(api_key: str, input_content: str, seo_rules: str,
         print_info(f"분석 결과: {parsed['result']} | 총점: {parsed['total_score']}/100")
         print_info(f"  - 제목: {parsed['title_score']}/50")
         print_info(f"  - 본문: {parsed['content_score']}/50")
+        print_info(f"  - 키워드 성공: {parsed['keyword_success_score']}/100")
 
         # PASS 조건 확인
         if (parsed["result"] == "PASS" or
             (parsed["total_score"] >= ANALYSIS_PASS_THRESHOLD and
              parsed["title_score"] >= TITLE_PASS_THRESHOLD and
-             parsed["content_score"] >= CONTENT_PASS_THRESHOLD)):
+             parsed["content_score"] >= CONTENT_PASS_THRESHOLD and
+             parsed["keyword_success_score"] >= KEYWORD_SUCCESS_THRESHOLD)):
             print_success("콘텐츠 품질 검증 통과!")
             final_content = content
             final_analysis = parsed
@@ -870,7 +925,7 @@ def analyze_keywords(api_key: str, input_content: str) -> dict:
     # 키워드 추출 프롬프트
     analyze_prompt = f"""당신은 SEO 및 키워드 분석 전문가입니다.
 
-다음 블로그 글 내용을 바탕으로, 구글 검색이나 AI 추천에 낫을 하기 쉬운 키워드를 분석해주세요.
+다음 블로그 글 내용을 바탕으로, 구글 검색이나 AI 추천에 노출하기 쉬운 키워드를 분석해주세요.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -881,29 +936,44 @@ def analyze_keywords(api_key: str, input_content: str) -> dict:
 
 요구사항:
 1. 블로그 글에서 중요한 키워드를 추출 (메인 키워드, 관련 키워드 3-5개)
-2. 각 키워드에 대해 다음을 분석:
-   - 구글 월간 검색량 (추정)
-   - 경쟁도 (상/중/하)
-   - 동일한 키워드로 된 기존 상위 글의 수 (추정)
-3. 낫은 하기 쉬운 키워드(검색량이 높고 경쟁도가 낮은 키워드)를 우선 추천
+2. 각 키워드에 대해 다음을 상세히 분석:
+   - 구글 월간 검색량 (추정 수치)
+   - 경쟁 콘텐츠 수 (추정 수치)
+   - 키워드 난이도 (상/중/하)
+   - 경쟁 강도 (높음/보통/낮음)
+   - 성공 가능성 점수 (0-100)
+3. 노출하기 쉬운 키워드(검색량이 높고 경쟁도가 낮은 키워드)를 우선 추천
 4. 제목에 꼭 넣어야만 하는 핵심 키워드 3개 추천
 
 아래 형식에 맞춰 결과를 출력해주세요:
 
 [추천 타겟 키워드]
-- 키워드 1: [검색량 추정 / 경쟁도 / 경쟁 낮은 이유]
-- 키워드 2: [검색량 추정 / 경쟁도 / 경쟁 낮은 이유]
-- 키워드 3: [검색량 추정 / 경쟁도 / 경쟁 낮은 이유]
+1. 키워드명
+   - 월간 검색량: [숫자]회/월
+   - 경쟁 콘텐츠 수: [숫자]개
+   - 키워드 난이도: 상/중/하
+   - 경쟁 강도: 높음/보통/낮음
+   - 성공 가능성 점수: 0-100
+   - 추천 이유: [간단한 설명]
+
+2. 키워드명
+   - 월간 검색량: [숫자]회/월
+   - 경쟁 콘텐츠 수: [숫자]개
+   - 키워드 난이도: 상/중/하
+   - 경쟁 강도: 높음/보통/낮음
+   - 성공 가능성 점수: 0-100
+   - 추천 이유: [간단한 설명]
 
 [제목에 넣어야만 하는 키워드]
 1. 키워드 A
 2. 키워드 B
 3. 키워드 C
 
-[키워드 분석 근거]
-- 검색량: 높음(10,000+/월), 중간(1,000-9,999/월), 낮음(1,000 미만/월)
-- 경쟁도: 상(상위 10위 내 기존 글 많음), 중(상위 11-30위), 하(상위 31위 이후)
-- 동일한 키워드로 된 글 수: 매우 많음(100+), 많음(50-99), 보통(20-49), 적음(10-19), 매우 적음(10 미만)
+[분석 기준]
+- 월간 검색량: 높음(10,000+/월), 중간(1,000-9,999/월), 낮음(1,000 미만/월)
+- 키워드 난이도: 상(상위 10위 진입 어려움), 중(상위 11-30위 가능), 하(상위 31위 이후 가능)
+- 경쟁 강도: 높음(경쟁 콘텐츠 50개 이상), 보통(20-49개), 낮음(19개 이하)
+- 성공 가능성 점수: 검색량 × (1/경쟁도) × 품질 요소
 """
 
     # API 호출
@@ -913,6 +983,7 @@ def analyze_keywords(api_key: str, input_content: str) -> dict:
         return {
             "target_keywords": [],
             "must_include_keywords": [],
+            "keywords_detail": [],
             "analysis": "분석 실패"
         }
 
@@ -921,7 +992,9 @@ def analyze_keywords(api_key: str, input_content: str) -> dict:
     lines = analysis_result.split('\n')
     target_keywords = []
     must_include_keywords = []
+    keywords_detail = []
     current_section = None
+    current_keyword = None
 
     for line in lines:
         stripped = line.strip()
@@ -929,18 +1002,206 @@ def analyze_keywords(api_key: str, input_content: str) -> dict:
             current_section = 'target'
         elif '[제목에 넣어야만 하는 키워드]' in stripped:
             current_section = 'must_include'
-        elif current_section and stripped.startswith(('- ', '• ')):
-            keyword = stripped.split(':', 1)[0].strip('- • ').strip()
+        elif current_section and stripped.startswith(('- ', '• ', '1. ', '2. ', '3. ')):
             if current_section == 'target':
-                target_keywords.append(keyword)
+                # 숫자/불릿 제거 후 키워드명 추출
+                keyword_match = re.match(r'^[-•\d\s]+(.+)$', stripped)
+                if keyword_match:
+                    keyword = keyword_match.group(1).strip()
+                    # 콜론 뒤 내용 제거
+                    if ':' in keyword:
+                        keyword = keyword.split(':')[0].strip()
+                    if keyword and keyword not in [k.get('name', '') for k in keywords_detail]:
+                        current_keyword = {'name': keyword}
+                        keywords_detail.append(current_keyword)
+                        target_keywords.append(keyword)
             elif current_section == 'must_include':
-                must_include_keywords.append(keyword)
+                # 숫자/불릿 제거 후 키워드명 추출
+                keyword_match = re.match(r'^[-•\d\s]+(.+)$', stripped)
+                if keyword_match:
+                    keyword = keyword_match.group(1).strip()
+                    if keyword and keyword not in must_include_keywords:
+                        must_include_keywords.append(keyword)
+        elif current_keyword and stripped.startswith('-'):
+            # 키워드 상세 정보 파싱
+            if '월간 검색량:' in stripped:
+                match = re.search(r'월간 검색량:\s*([0-9,]+)', stripped)
+                if match:
+                    current_keyword['search_volume'] = match.group(1).replace(',', '')
+            elif '경쟁 콘텐츠 수:' in stripped:
+                match = re.search(r'경쟁 콘텐츠 수:\s*([0-9]+)', stripped)
+                if match:
+                    current_keyword['competition_count'] = match.group(1)
+            elif '키워드 난이도:' in stripped:
+                match = re.search(r'키워드 난이도:\s*(상|중|하)', stripped)
+                if match:
+                    current_keyword['difficulty'] = match.group(1)
+            elif '경쟁 강도:' in stripped:
+                match = re.search(r'경쟁 강도:\s*(높음|보통|낮음)', stripped)
+                if match:
+                    current_keyword['competition_intensity'] = match.group(1)
+            elif '성공 가능성 점수:' in stripped:
+                match = re.search(r'성공 가능성 점수:\s*(\d+)', stripped)
+                if match:
+                    current_keyword['success_score'] = int(match.group(1))
+            elif '추천 이유:' in stripped:
+                reason = stripped.split('추천 이유:', 1)[1].strip()
+                current_keyword['reason'] = reason
 
     return {
         "target_keywords": target_keywords,
         "must_include_keywords": must_include_keywords,
-        "analysis": analysis_result[:500]  # 요약만 저장
+        "keywords_detail": keywords_detail,
+        "full_analysis": analysis_result
     }
+
+
+def save_keyword_metrics(keyword_analysis: dict, input_content: str) -> bool:
+    """
+    키워드 분석 결과를 docs/keyword_metrics.md에 저장
+
+    Args:
+        keyword_analysis: 키워드 분석 결과 딕셔너리
+        input_content: input.txt 내용
+
+    Returns:
+        성공 여부
+    """
+    import time
+
+    print_info("키워드 메트릭 문서 생성 중...")
+
+    metrics_path = os.path.join(CURRENT_DIR, "docs", "keyword_metrics.md")
+
+    # 문서 생성
+    doc_content = f"""# 키워드 메트릭 분석 보고서
+
+생성일시: {time.strftime('%Y-%m-%d %H:%M:%S')}
+분석 대상: input.txt 기반 블로그 글
+
+---
+
+## 요약
+
+- 추천 타겟 키워드: {len(keyword_analysis.get('target_keywords', []))}개
+- 제목에 필수 포함 키워드: {len(keyword_analysis.get('must_include_keywords', []))}개
+
+---
+
+## 제목에 필수 포함 키워드
+
+다음 키워드는 제목 생성 시 반드시 포함되어야 합니다:
+
+"""
+
+    for i, keyword in enumerate(keyword_analysis.get('must_include_keywords', []), 1):
+        doc_content += f"{i}. `{keyword}`\n"
+
+    doc_content += "\n---\n\n## 추천 타겟 키워드 상세 분석\n\n"
+
+    keywords_detail = keyword_analysis.get('keywords_detail', [])
+    if keywords_detail:
+        doc_content += "### 키워드 메트릭 표\n\n"
+        doc_content += "| 순위 | 키워드 | 월간 검색량 | 경쟁 콘텐츠 수 | 난이도 | 경쟁 강도 | 성공 점수 |\n"
+        doc_content += "|------|--------|-------------|----------------|--------|----------|----------|\n"
+
+        for i, kw in enumerate(keywords_detail, 1):
+            name = kw.get('name', '-')
+            search_vol = kw.get('search_volume', '-')
+            comp_count = kw.get('competition_count', '-')
+            difficulty = kw.get('difficulty', '-')
+            comp_int = kw.get('competition_intensity', '-')
+            success_score = kw.get('success_score', '-')
+
+            doc_content += f"| {i} | `{name}` | {search_vol} | {comp_count}개 | {difficulty} | {comp_int} | {success_score} |\n"
+
+        doc_content += "\n"
+
+        # 상세 분석
+        doc_content += "### 개별 키워드 분석\n\n"
+
+        for i, kw in enumerate(keywords_detail, 1):
+            name = kw.get('name', 'Unknown')
+            search_vol = kw.get('search_volume', 'N/A')
+            comp_count = kw.get('competition_count', 'N/A')
+            difficulty = kw.get('difficulty', 'N/A')
+            comp_int = kw.get('competition_intensity', 'N/A')
+            success_score = kw.get('success_score', 0)
+            reason = kw.get('reason', '')
+
+            # 검색량 범주
+            try:
+                vol_num = int(str(search_vol).replace(',', ''))
+                if vol_num >= 10000:
+                    vol_category = "높음 (10,000+/월)"
+                elif vol_num >= 1000:
+                    vol_category = "중간 (1,000-9,999/월)"
+                else:
+                    vol_category = "낮음 (1,000 미만/월)"
+            except:
+                vol_category = search_vol
+
+            # 성공 가능성 평가
+            if success_score >= 80:
+                success_eval = "매우 높음"
+                success_color = "🟢"
+            elif success_score >= 60:
+                success_eval = "높음"
+                success_color = "🟢"
+            elif success_score >= 40:
+                success_eval = "보통"
+                success_color = "🟡"
+            else:
+                success_eval = "낮음"
+                success_color = "🔴"
+
+            doc_content += f"#### {i}. {name} {success_color}\n\n"
+            doc_content += f"- **월간 검색량**: {search_vol}회/월 ({vol_category})\n"
+            doc_content += f"- **경쟁 콘텐츠 수**: {comp_count}개\n"
+            doc_content += f"- **키워드 난이도**: {difficulty}\n"
+            doc_content += f"- **경쟁 강도**: {comp_int}\n"
+            doc_content += f"- **성공 가능성 점수**: {success_score}/100 ({success_eval})\n"
+
+            if reason:
+                doc_content += f"- **추천 이유**: {reason}\n"
+
+            doc_content += "\n"
+
+    else:
+        doc_content += "> 키워드 상세 분석 데이터가 없습니다.\n\n"
+
+    # 전체 분석 원본
+    doc_content += "---\n\n## 원본 분석 결과\n\n"
+    doc_content += "```\n"
+    doc_content += keyword_analysis.get('full_analysis', '분석 결과 없음')
+    doc_content += "\n```\n"
+
+    doc_content += "\n---\n\n## 분석 기준\n\n"
+    doc_content += "### 월간 검색량\n"
+    doc_content += "- **높음**: 10,000회/월 이상\n"
+    doc_content += "- **중간**: 1,000-9,999회/월\n"
+    doc_content += "- **낮음**: 1,000회/월 미만\n\n"
+
+    doc_content += "### 키워드 난이도\n"
+    doc_content += "- **상**: 구글 상위 10위 진입이 매우 어려움 (경쟁 심함)\n"
+    doc_content += "- **중**: 상위 11-30위 진입 가능\n"
+    doc_content += "- **하**: 상위 31위 이후 진입 가능\n\n"
+
+    doc_content += "### 경쟁 강도\n"
+    doc_content += "- **높음**: 경쟁 콘텐츠 50개 이상\n"
+    doc_content += "- **보통**: 경쟁 콘텐츠 20-49개\n"
+    doc_content += "- **낮음**: 경쟁 콘텐츠 19개 이하\n\n"
+
+    doc_content += "### 성공 가능성 점수\n"
+    doc_content += "- **80-100점**: 매우 높음 (🟢) - 최우선 타겟\n"
+    doc_content += "- **60-79점**: 높음 (🟢) - 적극 활용 추천\n"
+    doc_content += "- **40-59점**: 보통 (🟡) - 보조 키워드로 활용\n"
+    doc_content += "- **0-39점**: 낮음 (🔴) - 키워드 재고 필요\n\n"
+
+    doc_content += "---\n\n*본 문서는 SEO Blog AI Optimizer v2.0.0에 의해 자동 생성되었습니다.*\n"
+
+    # 파일 저장
+    return write_file(metrics_path, doc_content)
 
 
 def run_optimization():
@@ -995,13 +1256,15 @@ def run_optimization():
     keyword_analysis = analyze_keywords(api_key, input_content)
     print_success(f"키워드 분석 완료: {len(keyword_analysis['must_include_keywords'])}개 추천 키워드")
 
+    # 2.6. 키워드 메트릭 문서 저장
+    print("\n2.6. 키워드 메트릭 문서 저장...")
+    if save_keyword_metrics(keyword_analysis, input_content):
+        print_success("키워드 메트릭 문서 저장 완료")
+    else:
+        print_warning("키워드 메트릭 문서 저장 실패 (계속 진행)")
+
     # 3. 입력 파일 읽기 (이미 위에서 읽음)
     print("\n3. 입력 파일 확인 완료")
-        print_error("input.txt 파일이 비어있거나 없습니다.")
-        print_info(f"파일 위치: {input_path}")
-        input("\n엔터를 눌러 종료...")
-        return
-
     print_success(f"입력 파일 확인 완료 ({len(input_content)}자)")
 
     # 4. SEO 규칙 파일 읽기
@@ -1027,7 +1290,7 @@ def run_optimization():
     # 6. 피드백 루프를 포함한 콘텐츠 생성
     print("\n6. AI 콘텐츠 생성 및 검증...")
 
-    result, analysis = generate_output_with_retry(api_key, input_content, seo_rules, ai_rules, MAX_RETRIES)
+    result, analysis = generate_output_with_retry(api_key, input_content, seo_rules, ai_rules, keyword_analysis, MAX_RETRIES)
 
     if not result:
         input("\n엔터를 눌러 종료...")
@@ -1045,6 +1308,7 @@ def run_optimization():
 최종 점수: {analysis.get('total_score', 0)}/100
   - 제목: {analysis.get('title_score', 0)}/50
   - 본문: {analysis.get('content_score', 0)}/50
+  - 키워드 성공: {analysis.get('keyword_success_score', 0)}/100
 검증 결과: {analysis.get('result', 'UNKNOWN')}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
