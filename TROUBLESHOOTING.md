@@ -177,6 +177,16 @@ ssh-add ~/.ssh/id_ed25519
    - `New SSH key` 클릭
    - `cat ~/.ssh/id_ed25519.pub` 내용 붙여넣기
 
+   **중요: 띄어쓰기 규칙**
+   ```
+   ssh-ed25519 [긴_키_문자열] 이메일주소@example.com
+             ^              ^
+            공백 1        공백 2
+   ```
+   - `ssh-ed25519`와 긴 키 문자열 사이: 공백 1칸
+   - 긴 키 문자열과 이메일 사이: 공백 1칸
+   - 이 외에는 공백 없이 한 줄로 연속 입력해야 함
+
 4. Remote URL을 SSH로 변경
 ```bash
 git remote set-url origin git@github.com:사용자명/저장소명.git
