@@ -153,9 +153,40 @@ echo "글의 주제와 목표" > input/input.txt
 
 ---
 
+### 문제 9: 핸드폰 SSH 연결에서 git push 실패
+**증상:** `could not read Username for 'https://github.com': No such file or address`
+
+**원인:**
+- 핸드폰에서 SSH 원격 접속 시 대화형 입력(`/dev/tty`)이 불가능
+- HTTPS 방식은 브라우저 로그인이 필요함
+
+**해결 방법:**
+1. SSH 키 생성
+```bash
+ssh-keygen -t ed25519 -C "이메일주소@example.com" -f ~/.ssh/id_ed25519 -N ""
+```
+
+2. SSH 에이전트에 키 추가
+```bash
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_ed25519
+```
+
+3. 깃허브에 공개 키 등록
+   - https://github.com/settings/keys 접속
+   - `New SSH key` 클릭
+   - `cat ~/.ssh/id_ed25519.pub` 내용 붙여넣기
+
+4. Remote URL을 SSH로 변경
+```bash
+git remote set-url origin git@github.com:사용자명/저장소명.git
+```
+
+---
+
 ## Windows 환경 문제
 
-### 문제 9: batch 파일 실행 시 encoding 오류
+### 문제 10: batch 파일 실행 시 encoding 오류
 **증상:** `UnicodeDecodeError` 또는 한글 깨짐
 
 **원인:**
@@ -172,7 +203,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 ---
 
-### 문제 10: Python 모듈 설치 실패
+### 문제 11: Python 모듈 설치 실패
 **증상:** `ModuleNotFoundError: No module named 'anthropic'`
 
 **원인:**
@@ -202,6 +233,7 @@ pip install anthropic
 
 | 날짜 | 문제 | 상태 |
 |------|------|------|
+| 2026-03-08 | 핸드폰 SSH 연결 git push 문제 및 SSH 키 설정 가이드 추가 | 해결됨 |
 | 2026-03-08 | git push 권한 문제 | 해결됨 |
 | 2026-03-08 | Windows 경로 처리 개선 | 적용됨 |
 | 2026-03-08 | 문서 생성 | 초기 버전 |
