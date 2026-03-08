@@ -1,0 +1,271 @@
+# SEO Blog AI Optimizer
+
+SEO와 AI 검색 노출 관점에서 블로그 글과 제목을 최적화하는 도구
+
+## 프로젝트 구조
+
+```
+ai-seo/
+├── input/                      # 최적화할 글 설명 파일 (.txt)
+├── output/                     # 최적화 결과 파일 (제목 5개 + 본문 가이드)
+├── docs/                       # 문서화된 규칙 저장소
+│   ├── seo_rules.md           # SEO 규칙 문서 (에이전트 1)
+│   ├── ai_search_rules.md     # AI 검색 노출 규칙 (에이전트 2)
+│   └── validation_report.md   # 검증 보고서 (에이전트 3)
+├── config/
+│   └── api_key.txt            # GLM-5 API Key
+├── agents/                     # 서브에이전트 설정/정의
+│   ├── seo_researcher.md      # SEO 규칙 조사 에이전트
+│   ├── ai_search_researcher.md # AI 검색 노출 조사 에이전트
+│   ├── validator.md           # 검증 에이전트
+│   ├── content_generator.md   # 콘텐츠 생성 에이전트
+│   ├── search_ranking_analyzer.md # 검색 랭킹 분석 에이전트
+│   └── tester.md             # QA 및 테스트 에이전트
+└── CLAUDE.md                   # 프로젝트 문서
+```
+
+## 에이전트 팀 구성
+
+프로젝트에서 사용할 에이전트와 실제 에이전트 이름 매핑:
+
+| # | 역할 | 에이전트 ID | 대응 파일 |
+|---|--------|-------------|-----------|
+| 1 | SEO 규칙 조사 | `seo-rules-documenter` | agents/seo_researcher.md |
+| 2 | AI 검색 최적화 | `ai-search-optimizer` | agents/ai_search_researcher.md |
+| 3 | 검증 | `seo-search-verifier` | agents/validator.md |
+| 4 | 콘텐츠 생성 | `blog-title-optimizer` | agents/content_generator.md |
+| 5 | 검색 랭킹 분석 | `search-ranking-analyzer` | agents/search_ranking_analyzer.md |
+| 6 | QA 및 테스트 | `qa-tester` | agents/tester.md |
+
+## 에이전트 상세 설명
+
+### 에이전트 1: seo-rules-documenter (SEO 규칙 조사)
+
+- **에이전트 ID**: `seo-rules-documenter`
+- **역할**: SEO 관점에서 준수해야 하는 규칙 조사 및 문서화
+- **작업**: `docs/seo_rules.md` 생성 및 관리
+- **실행 타이밍**: 프로젝트 실행 시마다 최신 경향 파악 후 문서 최신화
+- **검색 대상**:
+  - 최신 SEO 트렌드 (2026)
+  - 구글 검색 알고리즘 업데이트
+  - 제목, 메타디스크립션, 본문 최적화 규칙
+  - 키워드 배치, 내부 링크, 이미지 SEO
+
+### 에이전트 2: ai-search-optimizer (AI 검색 최적화)
+
+- **에이전트 ID**: `ai-search-optimizer`
+- **역할**: ChatGPT, Gemini 등 AI가 사이트/콘텐츠를 추천할 수 있는 규칙 조사
+- **작업**: `docs/ai_search_rules.md` 생성 및 관리
+- **실행 타이밍**: 프로젝트 실행 시마다 최신화
+- **검색 대상**:
+  - AI 검색 엔진(Perplexity, ChatGPT Search 등) 동작 원리
+  - AI가 신뢰하는 소스 특성
+  - E-E-A-T(경험, 전문성, 권위성, 신뢰성) 요구사항
+  - 구조화된 데이터, FAQ 포맷, 직접적인 답변 구조
+
+### 에이전트 3: seo-search-verifier (검증)
+
+- **에이전트 ID**: `seo-search-verifier`
+- **역할**: 1, 2번 에이전트가 만든 문서 더블체크
+- **작업**:
+  1. `docs/seo_rules.md` 검증
+  2. `docs/ai_search_rules.md` 검증
+  3. `docs/validation_report.md` 생성
+  4. 문제 발견 시 피드백 전달 → 1, 2번 에이전트 재작업
+- **검증 항목**:
+  - 규칙 간 충돌 여부
+  - 최신성 (2026년 트렌드 반영 여부)
+  - 실현 가능성
+  - 구체적이고 실행 가능한 가이드인지
+
+### 에이전트 4: blog-title-optimizer (콘텐츠 생성)
+
+- **에이전트 ID**: `blog-title-optimizer`
+- **역할**: 완성된 문서 기반으로 5개의 제목 추천 및 한/영 본문 가이드 생성
+- **작업**:
+  1. `input/` 폴더의 글 설명 파일 읽기
+  2. `docs/seo_rules.md`, `docs/ai_search_rules.md` 참조
+  3. 5개의 제목 추천 (예상 클릭률, SEO 점수, 설명 포함)
+  4. 한국어와 영어 두 버전의 본문 가이드 생성
+  5. 피드백 루프를 통한 품질 개선 (최대 3회)
+  6. 결과를 `output/` 폴더에 txt 파일로 저장
+- **API**: GLM-5 API 사용
+
+### 에이전트 5: search-ranking-analyzer (검색 랭킹 분석)
+
+- **에이전트 ID**: `search-ranking-analyzer`
+- **역할**: 생성된 콘텐츠가 구글 검색 노출과 AI 추천에 적합한지 평가
+- **작업**:
+  1. 생성된 콘텐츠 분석
+  2. 제목 평가 (50점): 길이, 키워드 배치, 클릭 유도력, AI 인용 가능성, 다양성
+  3. 본문 평가 (50점): 구조화, E-E-A-T 요소, AI 친화적 형식, 키워드 최적화, 이중 언어 지원
+  4. PASS/FAIL 판정 (총점 70점 이상 AND 제목 35점 이상 AND 본문 35점 이상)
+  5. FAIL 시 구체적인 피드백 제공
+- **API**: GLM-5 API 사용
+
+### 에이전트 6: qa-tester (QA 및 테스트)
+
+- **에이전트 ID**: `qa-tester`
+- **역할**: 모든 코딩 작업 후 기능 테스트 및 QA
+- **작업**:
+  1. 코드 리뷰 및 테스트 수행
+  2. 기능 동작 확인 (run.py, run.bat, 워크플로우)
+  3. 문제 발견 시 구체적 피드백 전달 → 코딩 에이전트 수정
+  4. 재테스트 후 최종 승인
+- **테스트 대상**:
+  - 파일 읽기/쓰기 기능
+  - API Key 추출 기능
+  - API 호출 기능
+  - 에러 처리 기능
+  - Windows 호환성
+
+## 워크플로우
+
+```
+프로젝트 실행
+    ↓
+에이전트 1: SEO 규칙 조사 → docs/seo_rules.md (seo-rules-documenter)
+에이전트 2: AI 검색 규칙 조사 → docs/ai_search_rules.md (ai-search-optimizer)
+    ↓
+에이전트 3: 검증 → docs/validation_report.md (seo-search-verifier)
+    ↓ (문제 있으면 1, 2로 피드백 루프)
+에이전트 4: 콘텐츠 생성 (제목 5개 + 한/영 버전) (blog-title-optimizer)
+    ↓
+에이전트 5: 검색 랭킹 분석 (search-ranking-analyzer)
+    ↓ (FAIL이면 피드백 반영 후 에이전트 4 재시도, 최대 3회)
+에이전트 6: 테스트 및 QA → 기능 검증 (qa-tester)
+    ↓ (문제 있으면 코딩 에이전트로 피드백 → 재테스트)
+최종 승인
+```
+
+## 입력 포맷 (input/)
+
+### 파일명
+`input.txt`
+
+### 파일 내용 형식
+
+```
+글의 주제와 목표
+타겟 독자
+핵심 전달 내용
+추가 요구사항
+```
+
+## 출력 포맷 (output/)
+
+### 파일명
+`output.txt`
+
+### 출력 내용
+
+```
+# SEO 최적화 블로그 글 가이드
+
+생성일시: 2026-03-07 14:30:45
+생성 시도: 2/3 (피드백 반영 후 재생성)
+최종 점수: 78/100
+  - 제목: 40/50
+  - 본문: 38/50
+검증 결과: PASS
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[한국어 버전]
+
+=== 제목 추천 (5개) ===
+1. [제목]
+   - 예상 클릭률: High/Medium/Low
+   - SEO 점수: 0-100
+   - 설명: 간단한 설명
+...
+
+=== 본문 구성 가이드 ===
+...
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[English Version]
+
+=== Title Recommendations (5) ===
+...
+
+=== Body Content Guide ===
+...
+```
+
+## API 설정
+
+GLM-5 API Key를 `config/api_key.txt`에 저장
+
+---
+
+## 사용 방법
+
+### 방법 1: 더블클릭 실행 (가장 간단)
+
+1. `input/input.txt`에 글 내용 작성
+2. `run.bat` 더블클릭
+3. `output/output.txt`에서 결과 확인
+
+**최초 실행 전 필요한 작업:**
+```bash
+pip install anthropic
+```
+
+### 방법 2: Python으로 직접 실행
+
+```bash
+python run.py
+```
+
+### 방법 3: Claude Code에서 실행
+
+프로젝트 폴더에서 `claude`를 실행하고 다음 요청:
+
+```
+input/input.txt에 있는 내용을 바탕으로 SEO 최적화된 블로그 글을 생성해줘.
+docs/seo_rules.md와 docs/ai_search_rules.md를 참고해서 output/output.txt에 결과를 저장해줘.
+```
+
+### 방법 4: 각 에이전트 순차 실행 (Claude Code)
+
+1. **에이전트 1 실행** - SEO 규칙 조사
+   ```
+   docs/seo_rules.md에 최신 SEO 규칙을 조사해서 문서화해줘.
+   ```
+   → `seo-rules-documenter` 에이전트가 자동으로 호출됨
+
+2. **에이전트 2 실행** - AI 검색 노출 규칙 조사
+   ```
+   docs/ai_search_rules.md에 AI 검색 노출 규칙을 조사해서 문서화해줘.
+   ```
+   → `ai-search-optimizer` 에이전트가 자동으로 호출됨
+
+3. **에이전트 3 실행** - 검증
+   ```
+   docs/seo_rules.md와 docs/ai_search_rules.md를 검증해서 docs/validation_report.md를 생성해줘.
+   문제가 있으면 피드백 전달해서 수정해줘.
+   ```
+   → `seo-search-verifier` 에이전트가 자동으로 호출됨
+
+4. **에이전트 4 실행** - 콘텐츠 생성
+   ```
+   input/input.txt를 읽고, docs/seo_rules.md와 docs/ai_search_rules.md를 참고해서
+   최적화된 블로그 글 제목 5개와 본문 가이드(한국어/영어)를 output/output.txt에 저장해줘.
+   config/api_key.txt의 GLM-5 API를 사용해.
+   ```
+   → `blog-title-optimizer` 에이전트가 자동으로 호출됨
+
+5. **에이전트 5 실행** - 검색 랭킹 분석 (선택)
+   ```
+   output/output.txt에 있는 콘텐츠를 분석해서 구글 검색 노출과 AI 추천에 적합한지 평가해줘.
+   docs/seo_rules.md와 docs/ai_search_rules.md를 참고해.
+   ```
+   → `search-ranking-analyzer` 에이전트가 자동으로 호출됨
+
+6. **에이전트 6 실행** - 테스트 및 QA
+   ```
+   run.py와 run.bat의 기능을 테스트하고 QA를 수행해줘.
+   ```
+   → `qa-tester` 에이전트가 자동으로 호출됨
